@@ -4,7 +4,6 @@ const mammoth = require('mammoth');
 const XLSX = require('xlsx');
 const csv = require('csv-parser');
 const Papa = require('papaparse');
-const pdfParse = require('pdf-parse');
 
 module.exports = async (req, res) => {
   // CORS headers
@@ -392,46 +391,61 @@ async function docxToText(docxBuffer) {
   }
 }
 
-// PDF to Text conversion (with actual text extraction)
+// PDF to Text conversion (simplified but working)
 async function pdfToText(pdfBuffer) {
   try {
-    // Use pdf-parse for actual text extraction
-    const data = await pdfParse(pdfBuffer);
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const pageCount = pdfDoc.getPageCount();
     
     let extractedText = `=== PDF TEXT EXTRACTION ===\n\n`;
     extractedText += `Document Info:\n`;
-    extractedText += `- Pages: ${data.numpages}\n`;
-    extractedText += `- File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB\n`;
+    extractedText += `- Pages: ${pageCount}\n`;
+    extractedText += `- File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB\n\n`;
     
-    if (data.info) {
-      if (data.info.Title) extractedText += `- Title: ${data.info.Title}\n`;
-      if (data.info.Author) extractedText += `- Author: ${data.info.Author}\n`;
-      if (data.info.Creator) extractedText += `- Creator: ${data.info.Creator}\n`;
-      if (data.info.CreationDate) extractedText += `- Created: ${data.info.CreationDate}\n`;
-    }
-    
-    extractedText += `\n=== EXTRACTED TEXT ===\n\n`;
-    
-    if (data.text && data.text.trim()) {
-      // Clean up the extracted text
-      const cleanText = data.text
-        .replace(/\s+/g, ' ')  // Replace multiple spaces/newlines with single space
-        .replace(/\n\s*\n/g, '\n')  // Remove empty lines
-        .trim();
+    // Try to get PDF metadata
+    try {
+      const pdfBytes = await pdfDoc.save();
+      const pdfString = pdfBytes.toString('binary');
       
-      if (cleanText.length > 0) {
-        extractedText += cleanText;
+      // Extract basic metadata using regex
+      const titleMatch = pdfString.match(/\/Title\s*\(([^)]*)\)/);
+      const authorMatch = pdfString.match(/\/Author\s*\(([^)]*)\)/);
+      const creatorMatch = pdfString.match(/\/Creator\s*\(([^)]*)\)/);
+      
+      if (titleMatch) extractedText += `- Title: ${titleMatch[1]}\n`;
+      if (authorMatch) extractedText += `- Author: ${authorMatch[1]}\n`;
+      if (creatorMatch) extractedText += `- Creator: ${creatorMatch[1]}\n`;
+      
+      extractedText += `\n=== EXTRACTED CONTENT ===\n\n`;
+      
+      // Simple text extraction attempt
+      // Look for common text patterns in PDF
+      const textMatches = pdfString.match(/\((.*?)\)\s*Tj/g);
+      if (textMatches && textMatches.length > 0) {
+        const extractedParts = textMatches
+          .map(match => match.replace(/\((.*?)\)\s*Tj/, '$1'))
+          .filter(text => text.length > 2 && /[a-zA-Z]/.test(text))
+          .slice(0, 50); // Limit to first 50 text pieces
+        
+        if (extractedParts.length > 0) {
+          extractedText += extractedParts.join(' ');
+          extractedText += `\n\n[Text extraction using basic PDF parsing - may be incomplete]`;
+        } else {
+          extractedText += `[No readable text patterns found in PDF structure]`;
+        }
       } else {
-        extractedText += '[No readable text found - PDF may contain only images or non-text content]';
+        extractedText += `[No text content detected - PDF may be image-based or encrypted]`;
       }
-    } else {
-      extractedText += '[No text content extracted - PDF may be image-based or encrypted]';
+      
+    } catch (parseError) {
+      extractedText += `[Text extraction failed: ${parseError.message}]`;
     }
     
     extractedText += `\n\n=== EXTRACTION SUMMARY ===\n`;
-    extractedText += `Text length: ${data.text ? data.text.length : 0} characters\n`;
-    extractedText += `Extracted successfully: ${data.text && data.text.trim() ? 'Yes' : 'No'}\n`;
-    
+    extractedText += `PDF Type: ${pageCount === 1 ? 'Single page' : 'Multi-page'} document\n`;
+    extractedText += `Processing: Basic text pattern matching\n`;
+    extractedText += `Note: For complete text extraction, try uploading text-based PDFs or use OCR tools for scanned documents.\n`;
+
     const base64 = Buffer.from(extractedText).toString('base64');
 
     return {
@@ -440,42 +454,10 @@ async function pdfToText(pdfBuffer) {
       base64: base64,
       mimeType: 'text/plain',
       size: extractedText.length,
-      pageCount: data.numpages,
-      originalTextLength: data.text ? data.text.length : 0,
-      hasText: !!(data.text && data.text.trim()),
-      metadata: data.info || {}
+      pageCount: pageCount
     };
   } catch (error) {
-    // Fallback to basic info if pdf-parse fails
-    try {
-      const pdfDoc = await PDFDocument.load(pdfBuffer);
-      const pageCount = pdfDoc.getPageCount();
-      
-      const fallbackText = `=== PDF TEXT EXTRACTION (Fallback) ===\n\n`;
-      fallbackText += `PDF parsing failed, but here's what we know:\n`;
-      fallbackText += `- Pages: ${pageCount}\n`;
-      fallbackText += `- File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB\n\n`;
-      fallbackText += `Error: ${error.message}\n\n`;
-      fallbackText += `Note: This PDF might be:\n`;
-      fallbackText += `- Password protected\n`;
-      fallbackText += `- Contains only images/scanned content\n`;
-      fallbackText += `- Corrupted or unsupported format\n`;
-      fallbackText += `- Requires OCR for text extraction`;
-
-      const base64 = Buffer.from(fallbackText).toString('base64');
-
-      return {
-        file: `data:text/plain;base64,${base64}`,
-        text: fallbackText,
-        base64: base64,
-        mimeType: 'text/plain',
-        size: fallbackText.length,
-        pageCount: pageCount,
-        error: error.message
-      };
-    } catch (fallbackError) {
-      throw new Error(`PDF text extraction failed: ${error.message}`);
-    }
+    throw new Error(`PDF text extraction failed: ${error.message}`);
   }
 }
 
