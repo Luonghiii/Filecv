@@ -179,13 +179,17 @@
             background: #28a745;
             color: white;
             text-decoration: none;
+            border: none;
             border-radius: 5px;
-            margin-top: 10px;
-            transition: background 0.3s ease;
+            margin: 10px 10px 0 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: bold;
         }
 
         .download-btn:hover {
             background: #218838;
+            transform: translateY(-1px);
         }
 
         .loading {
@@ -240,6 +244,26 @@
 
         .info-box ul {
             margin-left: 20px;
+        }
+
+        /* Success notification */
+        .success-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            font-weight: bold;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
         }
     </style>
 </head>
@@ -476,11 +500,11 @@
             html += `<p>Từ ${data.conversion}</p>`;
             html += `<p>Kích thước: ${(data.size / 1024).toFixed(2)} KB</p>`;
 
-            if (data.file) {
+            if (data.file || data.base64) {
                 const fileName = `converted.${toFormat.value}`;
                 
                 // Display preview for images
-                if (data.mimeType.startsWith('image/')) {
+                if (data.mimeType && data.mimeType.startsWith('image/') && data.file) {
                     html += `<img src="${data.file}" alt="Preview">`;
                 }
 
@@ -492,10 +516,107 @@
                     html += `<div style="max-height: 300px; overflow: auto; background: white; padding: 15px; border-radius: 5px; margin-top: 10px;">${data.html}</div>`;
                 }
 
-                html += `<a href="${data.file}" download="${fileName}" class="download-btn">📥 Tải xuống</a>`;
+                // Create download button with JavaScript function
+                const base64Data = data.base64 || (data.file ? data.file.split(',')[1] : null);
+                if (base64Data) {
+                    html += `<div style="margin-top: 15px;">`;
+                    html += `<button class="download-btn" onclick="downloadFile('${base64Data}', '${fileName}', '${data.mimeType}')">📥 Tải xuống ${fileName}</button>`;
+                    
+                    // Add copy buttons for text content
+                    if (data.text) {
+                        html += `<button class="download-btn" onclick="copyToClipboard('${escapeForAttribute(data.text)}')" style="background: #17a2b8;">📋 Copy Text</button>`;
+                    }
+                    if (data.html) {
+                        html += `<button class="download-btn" onclick="copyToClipboard('${escapeForAttribute(data.html)}')" style="background: #17a2b8;">📋 Copy HTML</button>`;
+                    }
+                    html += `</div>`;
+                }
             }
 
             result.innerHTML = html;
+        }
+
+        // Function to download file using Blob
+        function downloadFile(base64Data, fileName, mimeType) {
+            try {
+                // Convert base64 to blob
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: mimeType });
+
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                
+                // Cleanup
+                document.body.removeChild(link);
+                setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+                
+                showSuccess('File đã được tải xuống!');
+            } catch (error) {
+                console.error('Download error:', error);
+                showError('Không thể tải file. Vui lòng thử lại.');
+            }
+        }
+
+        // Function to copy text to clipboard
+        function copyToClipboard(text) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showSuccess('Đã copy vào clipboard!');
+                    }).catch(() => {
+                        fallbackCopyTextToClipboard(text);
+                    });
+                } else {
+                    fallbackCopyTextToClipboard(text);
+                }
+            } catch (error) {
+                showError('Không thể copy. Vui lòng thử lại.');
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.top = '0';
+            textArea.style.left = '0';
+            textArea.style.position = 'fixed';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showSuccess('Đã copy vào clipboard!');
+            } catch (error) {
+                showError('Không thể copy. Vui lòng thử lại.');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        // Function to show success message
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-notification';
+            successDiv.textContent = '✅ ' + message;
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+                if (document.body.contains(successDiv)) {
+                    document.body.removeChild(successDiv);
+                }
+            }, 3000);
         }
 
         function showError(message) {
@@ -507,6 +628,10 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function escapeForAttribute(text) {
+            return text.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
         }
     </script>
 </body>
