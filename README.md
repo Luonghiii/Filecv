@@ -247,12 +247,14 @@ if ($response['base64']) {
 
 Không cần thiết lập environment variables. API hoạt động ngay sau khi deploy.
 
-## ⚠️ Giới hạn Vercel
+## ⚠️ Giới hạn Vercel Free Plan
 
-- Execution time: 60 seconds (Hobby plan)
-- Memory: 3008 MB (tăng từ 1024 MB)
+- Execution time: 60 seconds
+- Memory: 2048 MB (tối đa cho Free plan)
 - Request body: 4.5 MB
 - PDF conversion có giới hạn do môi trường serverless
+- Bandwidth: 100GB/month
+- Functions: 125,000 invocations/month
 
 ## 🐛 Troubleshooting
 
@@ -270,7 +272,7 @@ Không cần thiết lập environment variables. API hoạt động ngay sau kh
 
 ### Timeout
 - Tăng maxDuration trong vercel.json (đã set 60s)
-- Sử dụng memory cao hơn (đã set 3008MB)
+- Sử dụng memory cao hơn (đã set 2048MB - max cho Free plan)
 
 ## 📦 Dependencies
 
@@ -288,7 +290,7 @@ Không cần thiết lập environment variables. API hoạt động ngay sau kh
 }
 ```
 
-## 🔧 Cấu hình Vercel
+## 🔧 Cấu hình Vercel (Free Plan)
 
 ```json
 {
@@ -296,7 +298,7 @@ Không cần thiết lập environment variables. API hoạt động ngay sau kh
   "functions": {
     "api/convert.js": {
       "maxDuration": 60,
-      "memory": 3008
+      "memory": 2048
     }
   }
 }
@@ -331,5 +333,5 @@ Made with ❤️ by Luonghiii
 - ✅ Added copy to clipboard functionality
 - ✅ Improved UI with success notifications
 - ✅ Better error handling and user feedback
-- ✅ Increased Vercel memory limit to 3008MB
+- ✅ Increased Vercel memory limit to 2048MB (max for Free plan)
 - ✅ Enhanced API response format
