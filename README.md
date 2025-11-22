@@ -8,23 +8,35 @@ Công cụ chuyển đổi file đa năng với giao diện web đẹp, hỗ tr�
 - ✅ **Thêm nút copy text/HTML vào clipboard**
 - ✅ **Notification thông báo thành công**
 - ✅ **Giao diện responsive tốt hơn**
+- 🆕 **Hỗ trợ đầy đủ Excel/CSV conversions**
+- 🆕 **JSON ↔ XML conversions**
+- 🆕 **HTML ↔ PDF/Text conversions**
+- 🆕 **PDF to Image thật sự có ảnh download được**
+- 🆕 **Hỗ trợ SVG, TXT, XML formats**
 
 ## ✨ Tính năng
 
-### Chuyển đổi Image
-- JPG ↔ PNG ↔ WEBP ↔ GIF ↔ AVIF
+### 🖼️ Chuyển đổi Image
+- JPG ↔ PNG ↔ WEBP ↔ GIF ↔ AVIF ↔ SVG
 - Resize ảnh (width, height)
 - Điều chỉnh chất lượng (1-100)
 - Image → PDF
 
-### Chuyển đổi Document
-- DOCX → HTML
-- DOCX → Text
+### 📄 Chuyển đổi Document
+- DOCX ↔ HTML/Text/PDF
+- HTML ↔ PDF/Text
+- Text → PDF
 - Copy text/HTML vào clipboard
 
-### Chuyển đổi PDF
-- PDF → JPG/PNG (giới hạn do serverless)
-- Xem thông tin PDF
+### 📊 Chuyển đổi Spreadsheet & Data
+- XLSX ↔ CSV/JSON/HTML
+- CSV ↔ JSON/XLSX/HTML
+- JSON ↔ CSV/XLSX/XML/HTML
+- XML ↔ JSON
+
+### 📋 Chuyển đổi PDF
+- PDF → JPG/PNG/Text (có ảnh thật)
+- Image/Text/HTML → PDF
 
 ## 🚀 Deploy lên Vercel
 
@@ -264,11 +276,15 @@ Không cần thiết lập environment variables. API hoạt động ngay sau kh
 
 ```json
 {
-  "sharp": "^0.33.0",      // Image processing
-  "pdf-lib": "^1.17.1",   // PDF manipulation  
-  "mammoth": "^1.6.0",    // DOCX to HTML/text
+  "sharp": "^0.33.0",        // Image processing
+  "pdf-lib": "^1.17.1",     // PDF manipulation  
+  "mammoth": "^1.6.0",      // DOCX to HTML/text
   "html-pdf-node": "^1.0.8", // HTML to PDF
-  "jszip": "^3.10.1"      // ZIP handling
+  "jszip": "^3.10.1",       // ZIP handling
+  "xlsx": "^0.18.5",        // Excel/CSV processing
+  "papaparse": "^5.4.1",    // CSV parsing
+  "csv-parser": "^3.0.0",   // CSV utilities
+  "xml2js": "^0.6.2"        // XML processing
 }
 ```
 
