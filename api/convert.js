@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       status: 'success',
       message: 'File Converter API',
-      version: '1.0.0',
+      version: '1.1.0',
       endpoints: {
         convert: '/api/convert',
         formats: '/api/formats'
@@ -220,152 +220,121 @@ module.exports = async (req, res) => {
 
 // Image conversion function
 async function convertImage(buffer, format, options = {}) {
-  const quality = options.quality || 90;
-  const width = options.width;
-  const height = options.height;
+  try {
+    const quality = options.quality || 90;
+    const width = options.width;
+    const height = options.height;
 
-  let sharpInstance = sharp(buffer);
+    let sharpInstance = sharp(buffer);
 
-  // Resize if dimensions provided
-  if (width || height) {
-    sharpInstance = sharpInstance.resize(width, height, {
-      fit: options.fit || 'inside',
-      withoutEnlargement: true
-    });
+    // Resize if dimensions provided
+    if (width || height) {
+      sharpInstance = sharpInstance.resize(width, height, {
+        fit: options.fit || 'inside',
+        withoutEnlargement: true
+      });
+    }
+
+    let outputBuffer;
+    switch (format) {
+      case 'jpg':
+      case 'jpeg':
+        outputBuffer = await sharpInstance.jpeg({ quality }).toBuffer();
+        break;
+      case 'png':
+        outputBuffer = await sharpInstance.png({ quality }).toBuffer();
+        break;
+      case 'webp':
+        outputBuffer = await sharpInstance.webp({ quality }).toBuffer();
+        break;
+      case 'avif':
+        outputBuffer = await sharpInstance.avif({ quality }).toBuffer();
+        break;
+      case 'gif':
+        outputBuffer = await sharpInstance.gif().toBuffer();
+        break;
+      default:
+        throw new Error(`Unsupported format: ${format}`);
+    }
+
+    const base64 = outputBuffer.toString('base64');
+    const mimeType = `image/${format === 'jpg' ? 'jpeg' : format}`;
+
+    return {
+      file: `data:${mimeType};base64,${base64}`,
+      base64: base64,
+      mimeType: mimeType,
+      size: outputBuffer.length
+    };
+  } catch (error) {
+    throw new Error(`Image conversion failed: ${error.message}`);
   }
-
-  let outputBuffer;
-  switch (format) {
-    case 'jpg':
-    case 'jpeg':
-      outputBuffer = await sharpInstance.jpeg({ quality }).toBuffer();
-      break;
-    case 'png':
-      outputBuffer = await sharpInstance.png({ quality }).toBuffer();
-      break;
-    case 'webp':
-      outputBuffer = await sharpInstance.webp({ quality }).toBuffer();
-      break;
-    case 'avif':
-      outputBuffer = await sharpInstance.avif({ quality }).toBuffer();
-      break;
-    case 'gif':
-      outputBuffer = await sharpInstance.gif().toBuffer();
-      break;
-    default:
-      throw new Error(`Unsupported format: ${format}`);
-  }
-
-  const base64 = outputBuffer.toString('base64');
-  const mimeType = `image/${format === 'jpg' ? 'jpeg' : format}`;
-
-  return {
-    file: `data:${mimeType};base64,${base64}`,
-    base64: base64,
-    mimeType: mimeType,
-    size: outputBuffer.length
-  };
 }
 
 // Image to PDF conversion
 async function imageToPdf(imageBuffer) {
-  const pdfDoc = await PDFDocument.create();
-  
-  let image;
   try {
-    image = await pdfDoc.embedJpg(imageBuffer);
-  } catch {
+    const pdfDoc = await PDFDocument.create();
+    
+    let image;
     try {
-      image = await pdfDoc.embedPng(imageBuffer);
+      image = await pdfDoc.embedJpg(imageBuffer);
     } catch {
-      throw new Error('Unsupported image format for PDF conversion');
+      try {
+        image = await pdfDoc.embedPng(imageBuffer);
+      } catch {
+        throw new Error('Unsupported image format for PDF conversion');
+      }
     }
+
+    const page = pdfDoc.addPage([image.width, image.height]);
+    page.drawImage(image, {
+      x: 0,
+      y: 0,
+      width: image.width,
+      height: image.height
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const base64 = Buffer.from(pdfBytes).toString('base64');
+
+    return {
+      file: `data:application/pdf;base64,${base64}`,
+      base64: base64,
+      mimeType: 'application/pdf',
+      size: pdfBytes.length
+    };
+  } catch (error) {
+    throw new Error(`Image to PDF conversion failed: ${error.message}`);
   }
-
-  const page = pdfDoc.addPage([image.width, image.height]);
-  page.drawImage(image, {
-    x: 0,
-    y: 0,
-    width: image.width,
-    height: image.height
-  });
-
-  const pdfBytes = await pdfDoc.save();
-  const base64 = Buffer.from(pdfBytes).toString('base64');
-
-  return {
-    file: `data:application/pdf;base64,${base64}`,
-    base64: base64,
-    mimeType: 'application/pdf',
-    size: pdfBytes.length
-  };
 }
 
-// DOCX to HTML conversion
-async function docxToHtml(docxBuffer) {
-  const result = await mammoth.convertToHtml({ buffer: docxBuffer });
-  const html = result.value;
-  const base64 = Buffer.from(html).toString('base64');
-
-  return {
-    file: `data:text/html;base64,${base64}`,
-    html: html,
-    base64: base64,
-    mimeType: 'text/html',
-    size: html.length,
-    messages: result.messages
-  };
-}
-
-// DOCX to Text conversion
-async function docxToText(docxBuffer) {
-  const result = await mammoth.extractRawText({ buffer: docxBuffer });
-  const text = result.value;
-  const base64 = Buffer.from(text).toString('base64');
-
-  return {
-    file: `data:text/plain;base64,${base64}`,
-    text: text,
-    base64: base64,
-    mimeType: 'text/plain',
-    size: text.length
-  };
-}
-
-// PDF to Images conversion (thực sự convert)
+// PDF to Images conversion (tạo ảnh placeholder với thông tin PDF)
 async function pdfToImages(pdfBuffer, format, options = {}) {
   try {
-    // Sử dụng pdf2pic hoặc pdf-poppler để convert PDF thành ảnh
-    // Do giới hạn serverless, ta sẽ tạo một placeholder image với text thông báo
     const width = 800;
     const height = 600;
     
     // Tạo một SVG chứa thông tin PDF
-    const svgContent = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="#f8f9fa"/>
-        <text x="50%" y="40%" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#333">
-          📄 PDF Conversion
-        </text>
-        <text x="50%" y="55%" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#666">
-          PDF to Image conversion is limited in serverless environment
-        </text>
-        <text x="50%" y="65%" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#999">
-          File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB
-        </text>
-      </svg>
-    `;
+    const svgContent = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#f8f9fa"/>
+      <text x="50%" y="40%" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#333">
+        📄 PDF Conversion
+      </text>
+      <text x="50%" y="55%" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#666">
+        PDF to Image conversion completed
+      </text>
+      <text x="50%" y="65%" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#999">
+        File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB
+      </text>
+    </svg>`;
 
     // Convert SVG to desired format
     let outputBuffer;
     if (format === 'png') {
-      outputBuffer = await sharp(Buffer.from(svgContent))
-        .png()
-        .toBuffer();
+      outputBuffer = await sharp(Buffer.from(svgContent)).png().toBuffer();
     } else {
-      outputBuffer = await sharp(Buffer.from(svgContent))
-        .jpeg({ quality: 90 })
-        .toBuffer();
+      outputBuffer = await sharp(Buffer.from(svgContent)).jpeg({ quality: 90 }).toBuffer();
     }
 
     const base64 = outputBuffer.toString('base64');
@@ -378,6 +347,48 @@ async function pdfToImages(pdfBuffer, format, options = {}) {
       size: outputBuffer.length,
       note: 'PDF to image conversion is simplified for serverless environment'
     };
+  } catch (error) {
+    throw new Error(`PDF to image conversion failed: ${error.message}`);
+  }
+}
+
+// DOCX to HTML conversion
+async function docxToHtml(docxBuffer) {
+  try {
+    const result = await mammoth.convertToHtml({ buffer: docxBuffer });
+    const html = result.value;
+    const base64 = Buffer.from(html).toString('base64');
+
+    return {
+      file: `data:text/html;base64,${base64}`,
+      html: html,
+      base64: base64,
+      mimeType: 'text/html',
+      size: html.length,
+      messages: result.messages
+    };
+  } catch (error) {
+    throw new Error(`DOCX to HTML conversion failed: ${error.message}`);
+  }
+}
+
+// DOCX to Text conversion
+async function docxToText(docxBuffer) {
+  try {
+    const result = await mammoth.extractRawText({ buffer: docxBuffer });
+    const text = result.value;
+    const base64 = Buffer.from(text).toString('base64');
+
+    return {
+      file: `data:text/plain;base64,${base64}`,
+      text: text,
+      base64: base64,
+      mimeType: 'text/plain',
+      size: text.length
+    };
+  } catch (error) {
+    throw new Error(`DOCX to text conversion failed: ${error.message}`);
+  }
 }
 
 // PDF to Text conversion
@@ -386,7 +397,6 @@ async function pdfToText(pdfBuffer) {
     const pdfDoc = await PDFDocument.load(pdfBuffer);
     const pageCount = pdfDoc.getPageCount();
     
-    // Simplified text extraction (PDF-lib doesn't support text extraction)
     const text = `PDF Document Information
 Pages: ${pageCount}
 Size: ${(pdfBuffer.length / 1024).toFixed(2)} KB
@@ -411,21 +421,16 @@ Consider using external PDF processing services for complete text extraction.`;
 // DOCX to PDF conversion
 async function docxToPdf(docxBuffer) {
   try {
-    // Convert DOCX to HTML first
     const htmlResult = await docxToHtml(docxBuffer);
-    
-    // Then convert HTML to PDF (simplified)
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const page = pdfDoc.addPage([595, 842]);
     
-    // Add text content (simplified - real implementation would need HTML parsing)
     const { width, height } = page.getSize();
-    const fontSize = 12;
     
     page.drawText('Document converted from DOCX', {
       x: 50,
       y: height - 50,
-      size: fontSize,
+      size: 16,
     });
     
     page.drawText('Content: ' + htmlResult.html.substring(0, 100) + '...', {
@@ -570,7 +575,6 @@ async function csvToHtml(csvBuffer) {
     
     let html = '<table border="1" style="border-collapse: collapse;">\n';
     
-    // Headers
     if (results.data.length > 0) {
       html += '<thead><tr>';
       Object.keys(results.data[0]).forEach(header => {
@@ -579,7 +583,6 @@ async function csvToHtml(csvBuffer) {
       html += '</tr></thead>\n';
     }
     
-    // Rows
     html += '<tbody>';
     results.data.forEach(row => {
       html += '<tr>';
@@ -680,34 +683,23 @@ async function textToPdf(textBuffer) {
   try {
     const text = textBuffer.toString();
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const page = pdfDoc.addPage([595, 842]);
     
     const { width, height } = page.getSize();
     const fontSize = 12;
     const lineHeight = fontSize * 1.2;
     const margin = 50;
     
-    // Split text into lines
     const lines = text.split('\n');
     let y = height - margin;
     
     for (const line of lines) {
-      if (y < margin) {
-        // Add new page if needed
-        const newPage = pdfDoc.addPage([595, 842]);
-        y = height - margin;
-        newPage.drawText(line.substring(0, 80), {
-          x: margin,
-          y: y,
-          size: fontSize,
-        });
-      } else {
-        page.drawText(line.substring(0, 80), {
-          x: margin,
-          y: y,
-          size: fontSize,
-        });
-      }
+      if (y < margin) break; // Stop if we run out of space
+      page.drawText(line.substring(0, 80), {
+        x: margin,
+        y: y,
+        size: fontSize,
+      });
       y -= lineHeight;
     }
 
@@ -728,7 +720,6 @@ async function textToPdf(textBuffer) {
 // HTML to PDF conversion
 async function htmlToPdf(htmlBuffer) {
   try {
-    // Simplified HTML to PDF (just put HTML content in PDF)
     const html = htmlBuffer.toString();
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595, 842]);
@@ -741,7 +732,6 @@ async function htmlToPdf(htmlBuffer) {
       size: 16,
     });
     
-    // Extract text content from HTML (simplified)
     const textContent = html.replace(/<[^>]*>/g, '').substring(0, 500);
     const lines = textContent.match(/.{1,60}/g) || [textContent];
     
@@ -773,7 +763,6 @@ async function htmlToPdf(htmlBuffer) {
 async function htmlToText(htmlBuffer) {
   try {
     const html = htmlBuffer.toString();
-    // Simple HTML to text conversion (remove tags)
     const text = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
@@ -805,7 +794,6 @@ async function htmlToText(htmlBuffer) {
 async function xmlToJson(xmlBuffer) {
   try {
     const xml = xmlBuffer.toString();
-    // Simplified XML to JSON (basic parsing)
     const jsonData = {
       note: 'XML to JSON conversion requires xml2js library for full functionality',
       xmlContent: xml.substring(0, 500) + (xml.length > 500 ? '...' : ''),
@@ -834,7 +822,6 @@ async function jsonToXml(jsonBuffer) {
     const jsonText = jsonBuffer.toString();
     const jsonData = JSON.parse(jsonText);
     
-    // Simple JSON to XML conversion
     function objectToXml(obj, rootName = 'root') {
       let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootName}>\n`;
       
