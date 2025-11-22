@@ -391,7 +391,7 @@ async function docxToText(docxBuffer) {
   }
 }
 
-// PDF to Text conversion (simplified but working)
+// PDF to Text conversion (improved text extraction)
 async function pdfToText(pdfBuffer) {
   try {
     const pdfDoc = await PDFDocument.load(pdfBuffer);
@@ -400,51 +400,122 @@ async function pdfToText(pdfBuffer) {
     let extractedText = `=== PDF TEXT EXTRACTION ===\n\n`;
     extractedText += `Document Info:\n`;
     extractedText += `- Pages: ${pageCount}\n`;
-    extractedText += `- File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB\n\n`;
+    extractedText += `- File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB\n`;
     
-    // Try to get PDF metadata
+    // Convert PDF to string to analyze content
+    const pdfBytes = await pdfDoc.save();
+    const pdfString = pdfBytes.toString('binary');
+    
+    // Extract metadata
     try {
-      const pdfBytes = await pdfDoc.save();
-      const pdfString = pdfBytes.toString('binary');
-      
-      // Extract basic metadata using regex
       const titleMatch = pdfString.match(/\/Title\s*\(([^)]*)\)/);
       const authorMatch = pdfString.match(/\/Author\s*\(([^)]*)\)/);
       const creatorMatch = pdfString.match(/\/Creator\s*\(([^)]*)\)/);
+      const subjectMatch = pdfString.match(/\/Subject\s*\(([^)]*)\)/);
       
-      if (titleMatch) extractedText += `- Title: ${titleMatch[1]}\n`;
-      if (authorMatch) extractedText += `- Author: ${authorMatch[1]}\n`;
-      if (creatorMatch) extractedText += `- Creator: ${creatorMatch[1]}\n`;
-      
-      extractedText += `\n=== EXTRACTED CONTENT ===\n\n`;
-      
-      // Simple text extraction attempt
-      // Look for common text patterns in PDF
-      const textMatches = pdfString.match(/\((.*?)\)\s*Tj/g);
-      if (textMatches && textMatches.length > 0) {
-        const extractedParts = textMatches
-          .map(match => match.replace(/\((.*?)\)\s*Tj/, '$1'))
-          .filter(text => text.length > 2 && /[a-zA-Z]/.test(text))
-          .slice(0, 50); // Limit to first 50 text pieces
-        
-        if (extractedParts.length > 0) {
-          extractedText += extractedParts.join(' ');
-          extractedText += `\n\n[Text extraction using basic PDF parsing - may be incomplete]`;
-        } else {
-          extractedText += `[No readable text patterns found in PDF structure]`;
+      if (titleMatch && titleMatch[1]) extractedText += `- Title: ${titleMatch[1]}\n`;
+      if (authorMatch && authorMatch[1]) extractedText += `- Author: ${authorMatch[1]}\n`;
+      if (creatorMatch && creatorMatch[1]) extractedText += `- Creator: ${creatorMatch[1]}\n`;
+      if (subjectMatch && subjectMatch[1]) extractedText += `- Subject: ${subjectMatch[1]}\n`;
+    } catch (e) {
+      // Ignore metadata extraction errors
+    }
+    
+    extractedText += `\n=== EXTRACTED CONTENT ===\n\n`;
+    
+    // Multiple text extraction methods
+    let foundText = '';
+    
+    // Method 1: Look for text streams with BT/ET markers
+    const textStreamMatches = pdfString.match(/BT\s+.*?ET/gs);
+    if (textStreamMatches) {
+      const textParts = [];
+      textStreamMatches.forEach(stream => {
+        // Extract text from Tj operations
+        const tjMatches = stream.match(/\[(.*?)\]\s*TJ|\((.*?)\)\s*Tj/g);
+        if (tjMatches) {
+          tjMatches.forEach(match => {
+            let text = '';
+            if (match.includes('[') && match.includes(']')) {
+              // Array format [text]TJ
+              const arrayMatch = match.match(/\[(.*?)\]/);
+              if (arrayMatch) {
+                text = arrayMatch[1].replace(/[()]/g, '');
+              }
+            } else {
+              // Simple format (text)Tj
+              const simpleMatch = match.match(/\((.*?)\)/);
+              if (simpleMatch) {
+                text = simpleMatch[1];
+              }
+            }
+            if (text && text.length > 1 && /[a-zA-Z0-9]/.test(text)) {
+              textParts.push(text);
+            }
+          });
         }
-      } else {
-        extractedText += `[No text content detected - PDF may be image-based or encrypted]`;
-      }
+      });
       
-    } catch (parseError) {
-      extractedText += `[Text extraction failed: ${parseError.message}]`;
+      if (textParts.length > 0) {
+        foundText = textParts.join(' ').replace(/\s+/g, ' ').trim();
+      }
+    }
+    
+    // Method 2: Look for stream objects with text
+    if (!foundText) {
+      const streamMatches = pdfString.match(/stream\s+.*?endstream/gs);
+      if (streamMatches) {
+        streamMatches.forEach(stream => {
+          // Look for readable text patterns
+          const readableText = stream.match(/[a-zA-Z][a-zA-Z0-9\s.,!?]{10,}/g);
+          if (readableText) {
+            foundText += readableText.join(' ') + ' ';
+          }
+        });
+        foundText = foundText.trim();
+      }
+    }
+    
+    // Method 3: Direct text pattern search
+    if (!foundText) {
+      const directTextMatches = pdfString.match(/[A-Z][a-zA-Z0-9\s.,!?;:'"()-]{20,}/g);
+      if (directTextMatches) {
+        foundText = directTextMatches.slice(0, 10).join(' ').substring(0, 500);
+      }
+    }
+    
+    // Display results
+    if (foundText && foundText.length > 10) {
+      // Clean up and format the text
+      const cleanText = foundText
+        .replace(/[^\x20-\x7E\n]/g, '') // Remove non-printable characters
+        .replace(/\s+/g, ' ')
+        .replace(/(.{80})/g, '$1\n') // Add line breaks every 80 chars
+        .trim();
+      
+      extractedText += cleanText.substring(0, 2000); // Limit to 2000 chars
+      if (cleanText.length > 2000) {
+        extractedText += '\n\n[Text truncated - showing first 2000 characters]';
+      }
+      extractedText += `\n\n[Text extracted using PDF structure analysis]`;
+    } else {
+      extractedText += `[No readable text detected]\n\n`;
+      extractedText += `This PDF might be:\n`;
+      extractedText += `• Image-based (scanned document)\n`;
+      extractedText += `• Password protected or encrypted\n`;
+      extractedText += `• Contains only graphics/charts\n`;
+      extractedText += `• Uses non-standard text encoding\n\n`;
+      extractedText += `Suggestions:\n`;
+      extractedText += `• Try a text-based PDF (created from Word, Google Docs, etc.)\n`;
+      extractedText += `• Use OCR software for scanned documents\n`;
+      extractedText += `• Check if PDF is password protected`;
     }
     
     extractedText += `\n\n=== EXTRACTION SUMMARY ===\n`;
-    extractedText += `PDF Type: ${pageCount === 1 ? 'Single page' : 'Multi-page'} document\n`;
-    extractedText += `Processing: Basic text pattern matching\n`;
-    extractedText += `Note: For complete text extraction, try uploading text-based PDFs or use OCR tools for scanned documents.\n`;
+    extractedText += `Text found: ${foundText ? 'Yes' : 'No'}\n`;
+    extractedText += `Text length: ${foundText ? foundText.length : 0} characters\n`;
+    extractedText += `Method: Multi-pattern PDF parsing\n`;
+    extractedText += `Pages processed: ${pageCount}\n`;
 
     const base64 = Buffer.from(extractedText).toString('base64');
 
@@ -454,7 +525,9 @@ async function pdfToText(pdfBuffer) {
       base64: base64,
       mimeType: 'text/plain',
       size: extractedText.length,
-      pageCount: pageCount
+      pageCount: pageCount,
+      hasText: !!(foundText && foundText.length > 10),
+      extractedLength: foundText ? foundText.length : 0
     };
   } catch (error) {
     throw new Error(`PDF text extraction failed: ${error.message}`);
