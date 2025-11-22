@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Converter - Chuyển đổi file miễn phí</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .format-selector {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background: white;
+            transition: border-color 0.3s ease;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .arrow {
+            font-size: 2em;
+            color: #667eea;
+        }
+
+        .options {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .options.active {
+            display: block;
+        }
+
+        .option-group {
+            margin-bottom: 15px;
+        }
+
+        .option-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .option-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .convert-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .convert-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .convert-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.active {
+            display: block;
+        }
+
+        .result img {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .download-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+        }
+
+        .loading {
+            text-align: center;
+            display: none;
+            margin-top: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .info-box h3 {
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 File Converter</h1>
+        <p class="subtitle">Chuyển đổi file nhanh chóng & miễn phí</p>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <h3>Kéo thả file vào đây hoặc click để chọn</h3>
+            <p>Hỗ trợ: JPG, PNG, WEBP, GIF, DOCX, PDF</p>
+            <input type="file" id="fileInput" accept="image/*,.docx,.pdf">
+        </div>
+
+        <div class="format-selector">
+            <select id="fromFormat">
+                <option value="">Từ định dạng...</option>
+                <option value="jpg">JPG/JPEG</option>
+                <option value="png">PNG</option>
+                <option value="webp">WEBP</option>
+                <option value="gif">GIF</option>
+                <option value="docx">DOCX</option>
+                <option value="pdf">PDF</option>
+            </select>
+            <div class="arrow">→</div>
+            <select id="toFormat">
+                <option value="">Sang định dạng...</option>
+            </select>
+        </div>
+
+        <div class="options" id="options">
+            <h3 style="margin-bottom: 15px;">⚙️ Tùy chọn nâng cao</h3>
+            <div class="option-group">
+                <label>Chất lượng (1-100):</label>
+                <input type="number" id="quality" value="90" min="1" max="100">
+            </div>
+            <div class="option-group">
+                <label>Chiều rộng (pixels):</label>
+                <input type="number" id="width" placeholder="Auto">
+            </div>
+            <div class="option-group">
+                <label>Chiều cao (pixels):</label>
+                <input type="number" id="height" placeholder="Auto">
+            </div>
+        </div>
+
+        <button class="convert-btn" id="convertBtn" disabled>Chuyển đổi ngay</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Đang chuyển đổi file...</p>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result" id="result"></div>
+
+        <div class="info-box">
+            <h3>📋 Hỗ trợ chuyển đổi:</h3>
+            <ul>
+                <li>Image: JPG ↔ PNG ↔ WEBP ↔ GIF ↔ AVIF</li>
+                <li>Image → PDF</li>
+                <li>DOCX → HTML / Text</li>
+                <li>PDF → Images (giới hạn)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        const formatMappings = {
+            jpg: ['png', 'webp', 'gif', 'avif', 'pdf'],
+            png: ['jpg', 'webp', 'gif', 'avif', 'pdf'],
+            webp: ['jpg', 'png', 'gif', 'avif', 'pdf'],
+            gif: ['jpg', 'png', 'webp', 'pdf'],
+            docx: ['html', 'text'],
+            pdf: ['jpg', 'png']
+        };
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fromFormat = document.getElementById('fromFormat');
+        const toFormat = document.getElementById('toFormat');
+        const options = document.getElementById('options');
+        const convertBtn = document.getElementById('convertBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const result = document.getElementById('result');
+
+        // Upload area events
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            handleFile(file);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+            selectedFile = file;
+            uploadArea.innerHTML = `
+                <div class="upload-icon">✅</div>
+                <h3>${file.name}</h3>
+                <p>Kích thước: ${(file.size / 1024).toFixed(2)} KB</p>
+            `;
+            
+            // Auto detect format
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'jpeg') fromFormat.value = 'jpg';
+            else fromFormat.value = ext;
+            
+            updateToFormat();
+            convertBtn.disabled = false;
+        }
+
+        fromFormat.addEventListener('change', updateToFormat);
+
+        function updateToFormat() {
+            const from = fromFormat.value;
+            toFormat.innerHTML = '<option value="">Sang định dạng...</option>';
+            
+            if (formatMappings[from]) {
+                formatMappings[from].forEach(format => {
+                    const option = document.createElement('option');
+                    option.value = format;
+                    option.textContent = format.toUpperCase();
+                    toFormat.appendChild(option);
+                });
+            }
+
+            // Show options for image conversions
+            if (['jpg', 'png', 'webp', 'gif'].includes(from)) {
+                options.classList.add('active');
+            } else {
+                options.classList.remove('active');
+            }
+        }
+
+        toFormat.addEventListener('change', () => {
+            convertBtn.disabled = !toFormat.value;
+        });
+
+        convertBtn.addEventListener('click', convertFile);
+
+        async function convertFile() {
+            if (!selectedFile || !fromFormat.value || !toFormat.value) {
+                showError('Vui lòng chọn file và định dạng chuyển đổi');
+                return;
+            }
+
+            loading.classList.add('active');
+            error.classList.remove('active');
+            result.classList.remove('active');
+            convertBtn.disabled = true;
+
+            try {
+                // Read file as base64
+                const base64 = await fileToBase64(selectedFile);
+                
+                // Prepare request
+                const requestBody = {
+                    file: base64,
+                    from: fromFormat.value,
+                    to: toFormat.value,
+                    options: {}
+                };
+
+                // Add options for image conversions
+                if (options.classList.contains('active')) {
+                    const quality = document.getElementById('quality').value;
+                    const width = document.getElementById('width').value;
+                    const height = document.getElementById('height').value;
+                    
+                    if (quality) requestBody.options.quality = parseInt(quality);
+                    if (width) requestBody.options.width = parseInt(width);
+                    if (height) requestBody.options.height = parseInt(height);
+                }
+
+                // Call API
+                const response = await fetch('/api/convert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Conversion failed');
+                }
+
+                displayResult(data);
+
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                loading.classList.remove('active');
+                convertBtn.disabled = false;
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function displayResult(data) {
+            result.classList.add('active');
+            
+            let html = `<h3>✅ Chuyển đổi thành công!</h3>`;
+            html += `<p>Từ ${data.conversion}</p>`;
+            html += `<p>Kích thước: ${(data.size / 1024).toFixed(2)} KB</p>`;
+
+            if (data.file) {
+                const fileName = `converted.${toFormat.value}`;
+                
+                // Display preview for images
+                if (data.mimeType.startsWith('image/')) {
+                    html += `<img src="${data.file}" alt="Preview">`;
+                }
+
+                // Display text/html content
+                if (data.text) {
+                    html += `<pre style="max-height: 300px; overflow: auto; background: white; padding: 15px; border-radius: 5px; margin-top: 10px;">${escapeHtml(data.text)}</pre>`;
+                }
+                if (data.html) {
+                    html += `<div style="max-height: 300px; overflow: auto; background: white; padding: 15px; border-radius: 5px; margin-top: 10px;">${data.html}</div>`;
+                }
+
+                html += `<a href="${data.file}" download="${fileName}" class="download-btn">📥 Tải xuống</a>`;
+            }
+
+            result.innerHTML = html;
+        }
+
+        function showError(message) {
+            error.textContent = '❌ Lỗi: ' + message;
+            error.classList.add('active');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
