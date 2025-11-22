@@ -71,6 +71,13 @@ module.exports = async (req, res) => {
       case 'png-to-webp':
       case 'jpg-to-avif':
       case 'png-to-avif':
+      case 'webp-to-jpg':
+      case 'webp-to-jpeg':
+      case 'gif-to-jpg':
+      case 'gif-to-jpeg':
+      case 'avif-to-png':
+      case 'avif-to-jpg':
+      case 'avif-to-jpeg':
         result = await convertImage(fileBuffer, to, options);
         break;
 
@@ -79,6 +86,7 @@ module.exports = async (req, res) => {
       case 'jpeg-to-pdf':
       case 'png-to-pdf':
       case 'webp-to-pdf':
+      case 'gif-to-pdf':
         result = await imageToPdf(fileBuffer);
         break;
 
@@ -102,7 +110,7 @@ module.exports = async (req, res) => {
           error: 'Conversion not supported',
           requested: conversionKey,
           supported: [
-            'image-to-image',
+            'image-to-image (jpg, jpeg, png, webp, gif, avif)',
             'image-to-pdf',
             'docx-to-html',
             'docx-to-text',
@@ -216,6 +224,7 @@ async function docxToHtml(docxBuffer) {
   const base64 = Buffer.from(html).toString('base64');
 
   return {
+    file: `data:text/html;base64,${base64}`,
     html: html,
     base64: base64,
     mimeType: 'text/html',
@@ -231,6 +240,7 @@ async function docxToText(docxBuffer) {
   const base64 = Buffer.from(text).toString('base64');
 
   return {
+    file: `data:text/plain;base64,${base64}`,
     text: text,
     base64: base64,
     mimeType: 'text/plain',
@@ -238,7 +248,7 @@ async function docxToText(docxBuffer) {
   };
 }
 
-// PDF to Images conversion
+// PDF to Images conversion (simplified for serverless)
 async function pdfToImages(pdfBuffer, format, options = {}) {
   try {
     const pdfDoc = await PDFDocument.load(pdfBuffer);
@@ -246,12 +256,17 @@ async function pdfToImages(pdfBuffer, format, options = {}) {
     const maxPages = options.maxPages || pageCount;
     const pagesToConvert = Math.min(maxPages, pageCount);
 
-    return {
+    // Simplified response for serverless limitations
+    const simpleResponse = {
       totalPages: pageCount,
       convertedPages: pagesToConvert,
-      message: 'PDF to image conversion requires additional processing. Consider using external service.',
-      note: 'Vercel serverless functions have limitations for heavy PDF processing'
+      message: 'PDF to image conversion requires additional processing. Consider using external service for full functionality.',
+      note: 'Vercel serverless functions have limitations for heavy PDF processing',
+      size: pdfBuffer.length,
+      mimeType: `image/${format}`
     };
+
+    return simpleResponse;
   } catch (error) {
     throw new Error(`PDF processing failed: ${error.message}`);
   }
