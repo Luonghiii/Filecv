@@ -13,29 +13,48 @@ module.exports = async (req, res) => {
 
   const formats = {
     image: {
-      input: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'tiff'],
+      input: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg', 'tiff'],
       output: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'pdf'],
       features: ['resize', 'quality', 'format conversion']
     },
     document: {
       input: ['docx'],
-      output: ['html', 'text'],
-      features: ['text extraction', 'html conversion']
+      output: ['html', 'text', 'pdf'],
+      features: ['text extraction', 'html conversion', 'pdf generation']
+    },
+    spreadsheet: {
+      input: ['xlsx', 'csv'],
+      output: ['csv', 'json', 'html', 'xlsx'],
+      features: ['data conversion', 'table formatting']
+    },
+    data: {
+      input: ['json', 'csv', 'xml'],
+      output: ['json', 'csv', 'xml', 'html', 'xlsx'],
+      features: ['structured data conversion', 'format transformation']
     },
     pdf: {
       input: ['pdf'],
       output: ['jpg', 'png', 'text'],
-      features: ['page extraction', 'image conversion'],
+      features: ['page extraction', 'image conversion', 'text extraction'],
       note: 'Limited support in serverless environment'
+    },
+    web: {
+      input: ['html', 'text'],
+      output: ['pdf', 'text', 'html'],
+      features: ['web content conversion', 'markup processing']
     }
   };
 
   const conversions = [
-    { from: 'jpg/jpeg/png/webp/gif', to: 'jpg/png/webp/avif', category: 'Image Format' },
-    { from: 'jpg/jpeg/png/webp', to: 'pdf', category: 'Image to PDF' },
-    { from: 'docx', to: 'html', category: 'Document to HTML' },
-    { from: 'docx', to: 'text', category: 'Document to Text' },
-    { from: 'pdf', to: 'jpg/png', category: 'PDF to Image', note: 'Limited' }
+    { from: 'jpg/jpeg/png/webp/gif/svg', to: 'jpg/png/webp/avif/pdf', category: 'Image Format' },
+    { from: 'docx', to: 'html/text/pdf', category: 'Document Conversion' },
+    { from: 'xlsx', to: 'csv/json/html', category: 'Spreadsheet Export' },
+    { from: 'csv', to: 'json/xlsx/html', category: 'Data Conversion' },
+    { from: 'json', to: 'csv/xlsx/xml/html', category: 'JSON Export' },
+    { from: 'xml', to: 'json', category: 'XML Processing' },
+    { from: 'html', to: 'pdf/text', category: 'Web Content' },
+    { from: 'text', to: 'pdf', category: 'Text Processing' },
+    { from: 'pdf', to: 'jpg/png/text', category: 'PDF Export', note: 'Limited in serverless' }
   ];
 
   res.status(200).json({
