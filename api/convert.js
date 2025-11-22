@@ -4,6 +4,7 @@ const mammoth = require('mammoth');
 const XLSX = require('xlsx');
 const csv = require('csv-parser');
 const Papa = require('papaparse');
+const pdfParse = require('pdf-parse');
 
 module.exports = async (req, res) => {
   // CORS headers
@@ -391,30 +392,90 @@ async function docxToText(docxBuffer) {
   }
 }
 
-// PDF to Text conversion
+// PDF to Text conversion (with actual text extraction)
 async function pdfToText(pdfBuffer) {
   try {
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
-    const pageCount = pdfDoc.getPageCount();
+    // Use pdf-parse for actual text extraction
+    const data = await pdfParse(pdfBuffer);
     
-    const text = `PDF Document Information
-Pages: ${pageCount}
-Size: ${(pdfBuffer.length / 1024).toFixed(2)} KB
-
-Note: Full PDF text extraction requires additional libraries not supported in serverless environment.
-Consider using external PDF processing services for complete text extraction.`;
-
-    const base64 = Buffer.from(text).toString('base64');
+    let extractedText = `=== PDF TEXT EXTRACTION ===\n\n`;
+    extractedText += `Document Info:\n`;
+    extractedText += `- Pages: ${data.numpages}\n`;
+    extractedText += `- File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB\n`;
+    
+    if (data.info) {
+      if (data.info.Title) extractedText += `- Title: ${data.info.Title}\n`;
+      if (data.info.Author) extractedText += `- Author: ${data.info.Author}\n`;
+      if (data.info.Creator) extractedText += `- Creator: ${data.info.Creator}\n`;
+      if (data.info.CreationDate) extractedText += `- Created: ${data.info.CreationDate}\n`;
+    }
+    
+    extractedText += `\n=== EXTRACTED TEXT ===\n\n`;
+    
+    if (data.text && data.text.trim()) {
+      // Clean up the extracted text
+      const cleanText = data.text
+        .replace(/\s+/g, ' ')  // Replace multiple spaces/newlines with single space
+        .replace(/\n\s*\n/g, '\n')  // Remove empty lines
+        .trim();
+      
+      if (cleanText.length > 0) {
+        extractedText += cleanText;
+      } else {
+        extractedText += '[No readable text found - PDF may contain only images or non-text content]';
+      }
+    } else {
+      extractedText += '[No text content extracted - PDF may be image-based or encrypted]';
+    }
+    
+    extractedText += `\n\n=== EXTRACTION SUMMARY ===\n`;
+    extractedText += `Text length: ${data.text ? data.text.length : 0} characters\n`;
+    extractedText += `Extracted successfully: ${data.text && data.text.trim() ? 'Yes' : 'No'}\n`;
+    
+    const base64 = Buffer.from(extractedText).toString('base64');
 
     return {
       file: `data:text/plain;base64,${base64}`,
-      text: text,
+      text: extractedText,
       base64: base64,
       mimeType: 'text/plain',
-      size: text.length
+      size: extractedText.length,
+      pageCount: data.numpages,
+      originalTextLength: data.text ? data.text.length : 0,
+      hasText: !!(data.text && data.text.trim()),
+      metadata: data.info || {}
     };
   } catch (error) {
-    throw new Error(`PDF to text conversion failed: ${error.message}`);
+    // Fallback to basic info if pdf-parse fails
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBuffer);
+      const pageCount = pdfDoc.getPageCount();
+      
+      const fallbackText = `=== PDF TEXT EXTRACTION (Fallback) ===\n\n`;
+      fallbackText += `PDF parsing failed, but here's what we know:\n`;
+      fallbackText += `- Pages: ${pageCount}\n`;
+      fallbackText += `- File size: ${(pdfBuffer.length / 1024).toFixed(2)} KB\n\n`;
+      fallbackText += `Error: ${error.message}\n\n`;
+      fallbackText += `Note: This PDF might be:\n`;
+      fallbackText += `- Password protected\n`;
+      fallbackText += `- Contains only images/scanned content\n`;
+      fallbackText += `- Corrupted or unsupported format\n`;
+      fallbackText += `- Requires OCR for text extraction`;
+
+      const base64 = Buffer.from(fallbackText).toString('base64');
+
+      return {
+        file: `data:text/plain;base64,${base64}`,
+        text: fallbackText,
+        base64: base64,
+        mimeType: 'text/plain',
+        size: fallbackText.length,
+        pageCount: pageCount,
+        error: error.message
+      };
+    } catch (fallbackError) {
+      throw new Error(`PDF text extraction failed: ${error.message}`);
+    }
   }
 }
 
