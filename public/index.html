@@ -275,19 +275,32 @@
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
             <h3>Kéo thả file vào đây hoặc click để chọn</h3>
-            <p>Hỗ trợ: JPG, PNG, WEBP, GIF, DOCX, PDF</p>
-            <input type="file" id="fileInput" accept="image/*,.docx,.pdf">
+            <p>Hỗ trợ: JPG, PNG, WEBP, GIF, SVG, DOCX, PDF, XLSX, CSV, JSON, XML, HTML, TXT</p>
+            <input type="file" id="fileInput" accept="image/*,.docx,.pdf,.xlsx,.csv,.json,.xml,.html,.txt">
         </div>
 
         <div class="format-selector">
             <select id="fromFormat">
                 <option value="">Từ định dạng...</option>
-                <option value="jpg">JPG/JPEG</option>
-                <option value="png">PNG</option>
-                <option value="webp">WEBP</option>
-                <option value="gif">GIF</option>
-                <option value="docx">DOCX</option>
-                <option value="pdf">PDF</option>
+                <optgroup label="🖼️ Hình ảnh">
+                    <option value="jpg">JPG/JPEG</option>
+                    <option value="png">PNG</option>
+                    <option value="webp">WEBP</option>
+                    <option value="gif">GIF</option>
+                    <option value="svg">SVG</option>
+                </optgroup>
+                <optgroup label="📄 Tài liệu">
+                    <option value="docx">DOCX</option>
+                    <option value="pdf">PDF</option>
+                    <option value="html">HTML</option>
+                    <option value="text">TXT</option>
+                </optgroup>
+                <optgroup label="📊 Dữ liệu">
+                    <option value="xlsx">XLSX</option>
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                    <option value="xml">XML</option>
+                </optgroup>
             </select>
             <div class="arrow">→</div>
             <select id="toFormat">
@@ -325,10 +338,13 @@
         <div class="info-box">
             <h3>📋 Hỗ trợ chuyển đổi:</h3>
             <ul>
-                <li>Image: JPG ↔ PNG ↔ WEBP ↔ GIF ↔ AVIF</li>
-                <li>Image → PDF</li>
-                <li>DOCX → HTML / Text</li>
-                <li>PDF → Images (giới hạn)</li>
+                <li>🖼️ <strong>Images:</strong> JPG ↔ PNG ↔ WEBP ↔ GIF ↔ AVIF ↔ PDF</li>
+                <li>📄 <strong>Documents:</strong> DOCX ↔ HTML/Text/PDF</li>
+                <li>📊 <strong>Spreadsheets:</strong> XLSX ↔ CSV/JSON/HTML</li>
+                <li>📈 <strong>Data:</strong> CSV ↔ JSON ↔ XLSX ↔ HTML</li>
+                <li>🌐 <strong>Web:</strong> HTML ↔ PDF/Text</li>
+                <li>📋 <strong>Text:</strong> TXT → PDF</li>
+                <li>🔄 <strong>Data Exchange:</strong> JSON ↔ XML</li>
             </ul>
         </div>
     </div>
@@ -337,11 +353,19 @@
         let selectedFile = null;
         const formatMappings = {
             jpg: ['png', 'webp', 'gif', 'avif', 'pdf'],
+            jpeg: ['png', 'webp', 'gif', 'avif', 'pdf'],
             png: ['jpg', 'webp', 'gif', 'avif', 'pdf'],
             webp: ['jpg', 'png', 'gif', 'avif', 'pdf'],
             gif: ['jpg', 'png', 'webp', 'pdf'],
-            docx: ['html', 'text'],
-            pdf: ['jpg', 'png']
+            svg: ['jpg', 'png', 'webp', 'pdf'],
+            docx: ['html', 'text', 'pdf'],
+            xlsx: ['csv', 'json', 'html'],
+            csv: ['json', 'xlsx', 'html'],
+            json: ['csv', 'xlsx', 'xml', 'html'],
+            xml: ['json'],
+            html: ['pdf', 'text'],
+            text: ['pdf'],
+            pdf: ['jpg', 'png', 'text']
         };
 
         const uploadArea = document.getElementById('uploadArea');
@@ -389,8 +413,13 @@
             
             // Auto detect format
             const ext = file.name.split('.').pop().toLowerCase();
-            if (ext === 'jpeg') fromFormat.value = 'jpg';
-            else fromFormat.value = ext;
+            if (ext === 'jpeg') {
+                fromFormat.value = 'jpg';
+            } else if (ext === 'txt') {
+                fromFormat.value = 'text';
+            } else {
+                fromFormat.value = ext;
+            }
             
             updateToFormat();
             convertBtn.disabled = false;
